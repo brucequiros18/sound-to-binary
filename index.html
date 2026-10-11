@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Sound-to-Binary Converter</title>
+<style>
+:root{
+  --bg:#0c0f0e;
+  --panel:#121614;
+  --panel-2:#0e1211;
+  --line:rgba(255,255,255,.08);
+  --line-2:rgba(255,255,255,.14);
+  --text:#e7ede9;
+  --muted:#94a19a;
+  --accent:#5cf2a0;
+  --accent-ink:#05130c;
+  --accent-soft:rgba(92,242,160,.16);
+  --warn:#ffd9a6;
+  --warn-line:rgba(255,180,84,.4);
+  --warn-bg:rgba(255,180,84,.07);
+  --r-sm:6px;
+  --r-md:10px;
+  --mono:ui-monospace,"Cascadia Code","SF Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:
+    radial-gradient(1100px 420px at 50% -140px, rgba(92,242,160,.06), transparent 70%),
+    var(--bg);
+  color:var(--text);
+  font:400 15px/1.55 var(--sans);
+}
+[hidden]{display:none!important}
+::selection{background:var(--accent-soft);color:var(--text)}
+.wrap{max-width:1000px;margin:0 auto;padding:0 20px}
+.masthead{border-bottom:1px solid var(--line);padding:44px 0 30px}
+.kicker{margin:0 0 14px;font:500 12px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+h1{margin:0;font:700 clamp(2rem,4.6vw,2.6rem)/1.08 var(--sans);letter-spacing:-.02em}
+.arr{color:var(--accent)}
+.tagline{margin:12px 0 0;color:var(--muted);max-width:54ch}
+.byline{margin:18px 0 0;display:flex;gap:10px;align-items:center;font-size:14px}
+.byline-name{font-weight:600}
+.byline .dot{color:var(--accent)}
+.byline-section{color:var(--muted);font-weight:500}
+main{padding:28px 0 40px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md);padding:24px;margin-bottom:22px;box-shadow:0 1px 2px rgba(0,0,0,.35),0 18px 40px -28px rgba(0,0,0,.8)}
+h2{margin:0 0 16px;font:600 17px/1.25 var(--sans);letter-spacing:-.01em}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px}
+.field label{display:block;margin-bottom:7px;font-size:12.5px;letter-spacing:.02em;color:var(--muted);font-weight:500}
+.field input{width:100%;background:var(--panel-2);border:1px solid var(--line-2);border-radius:var(--r-sm);color:var(--text);font:500 16px/1.2 var(--mono);font-variant-numeric:tabular-nums;padding:11px 12px;transition:border-color .15s ease,box-shadow .15s ease}
+.field input:hover{border-color:rgba(255,255,255,.24)}
+.field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:20px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 22px;border-radius:8px;font:600 15px/1 var(--sans);cursor:pointer;border:1px solid transparent;transition:background-color .15s ease,border-color .15s ease,color .15s ease}
+.btn-primary{background:var(--accent);color:var(--accent-ink)}
+.btn-primary:hover{background:#7bf6b6}
+.btn-primary:active{background:#4bd98f}
+.btn-ghost{background:transparent;color:var(--text);border-color:var(--line-2)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.warning{display:flex;gap:12px;margin-top:18px;padding:13px 15px;border:1px solid var(--warn-line);background:var(--warn-bg);border-radius:8px;color:var(--warn)}
+.warn-icon{flex:none;margin-top:2px}
+.warn-title{margin:0 0 4px;font-weight:600;font-size:14px}
+.warning ul{margin:0;padding-left:18px;font-size:14px}
+.warning li+li{margin-top:3px}
+#scopeCanvas{display:block;width:100%;height:200px;background:#0a0d0c;border:1px solid var(--line);border-radius:8px}
+.legend{display:flex;flex-wrap:wrap;gap:18px;margin-top:10px;font-size:12.5px;color:var(--muted)}
+.legend-item{display:inline-flex;align-items:center;gap:7px}
+.sw{display:inline-block;width:16px;height:0;border-top:2px solid var(--accent)}
+.sw-step{border-top:2px dashed rgba(231,237,233,.55)}
+.sw-dot{width:7px;height:7px;border-radius:50%;background:var(--text);border-top:0}
+.results-section{margin-top:26px;padding-top:24px;border-top:1px solid var(--line)}
+.readouts{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.readout{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+.readout-label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:500}
+.readout-value{font:600 24px/1.15 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em;word-break:break-word}
+.table-scroll{overflow-x:auto}
+.data-table{width:100%;border-collapse:collapse;font-size:14.5px}
+.data-table th{font:600 11.5px/1.3 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;padding:10px 12px;border-bottom:1px solid var(--line-2);white-space:nowrap}
+.data-table td{padding:9px 12px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.data-table tbody tr:last-child td{border-bottom:0}
+.data-table tbody tr:hover td{background:rgba(255,255,255,.025)}
+.data-table .num{text-align:right;font-family:var(--mono);font-size:14px}
+.data-table td:first-child{font-family:var(--mono)}
+#sampleTable{min-width:540px}
+#testTable{min-width:900px}
+.data-table td.num{white-space:nowrap}
+#testTable td:last-child{white-space:normal}
+.binary-line{display:block;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:16px;color:var(--accent);font:600 16px/1.7 var(--mono);letter-spacing:.06em;word-break:break-all;min-height:32px}
+.total-bits{margin:12px 0 0;font-size:14.5px;color:var(--muted)}
+.total-bits strong{color:var(--text);font-family:var(--mono);font-size:16px}
+.note{margin:14px 0 0;font-size:13.5px;color:var(--muted)}
+.explain{margin:0;padding-left:22px;display:grid;gap:12px;font-size:15px;color:#cbd5cf}
+.explain strong{color:var(--text);font-weight:600}
+.site-footer{border-top:1px solid var(--line);padding:22px 0 34px;color:var(--muted);font-size:13.5px}
+@media (max-width:640px){
+  .masthead{padding:32px 0 24px}
+  .panel{padding:18px}
+  .readout-value{font-size:20px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+<header class="masthead">
+  <div class="wrap">
+    <p class="kicker">Multimedia · Asynchronous activity</p>
+    <h1>Sound <span class="arr">→</span> binary</h1>
+    <p class="tagline">Sample a wave, round every sample to a level, and read the result in bits.</p>
+    <p class="byline"><span class="byline-name">Your Name</span><span class="dot">·</span><span class="byline-section">Section 00</span></p>
+  </div>
+</header>
+<main class="wrap">
+  <form id="controlForm" class="panel" novalidate>
+    <div class="fields">
+      <div class="field">
+        <label for="frequencyInput">Frequency (Hz)</label>
+        <input id="frequencyInput" type="number" step="any" value="1000" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="amplitudeInput">Amplitude (0–1)</label>
+        <input id="amplitudeInput" type="number" step="any" min="0" max="1" value="1" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="samplesInput">Samples (2–64)</label>
+        <input id="samplesInput" type="number" step="1" value="4" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="bitsInput">Bits per sample (1–8)</label>
+        <input id="bitsInput" type="number" step="1" value="2" autocomplete="off">
+      </div>
+    </div>
+    <div class="actions">
+      <button id="convertBtn" class="btn btn-primary" type="submit">Convert</button>
+      <button id="playBtn" class="btn btn-ghost" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+        Play tone
+      </button>
+    </div>
+    <div id="warningBox" class="warning" role="alert" hidden>
+      <svg class="warn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 1.8 21h20.4L12 3z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.6" r="1.1" fill="currentColor" stroke="none"/></svg>
+      <div class="warn-body">
+        <p class="warn-title">Check your numbers</p>
+        <ul id="warningList"></ul>
+      </div>
+    </div>
+  </form>
+
+  <div id="results" hidden>
+    <section class="panel">
+      <canvas id="scopeCanvas" height="200" aria-hidden="true"></canvas>
+      <div class="legend" aria-hidden="true">
+        <span class="legend-item"><span class="sw"></span>wave</span>
+        <span class="legend-item"><span class="sw sw-step"></span>quantized levels</span>
+        <span class="legend-item"><span class="sw sw-dot"></span>samples</span>
+      </div>
+
+      <div class="results-section">
+        <h2>Wave facts</h2>
+        <div class="readouts">
+          <div class="readout"><span class="readout-label">Amplitude</span><span class="readout-value" id="factAmplitude">—</span></div>
+          <div class="readout"><span class="readout-label">Frequency</span><span class="readout-value" id="factFrequency">—</span></div>
+          <div class="readout"><span class="readout-label">Period</span><span class="readout-value" id="factPeriod">—</span></div>
+          <div class="readout"><span class="readout-label">Wavelength</span><span class="readout-value" id="factWavelength">—</span></div>
+        </div>
+      </div>
+
+      <div class="results-section">
+        <h2>Samples</h2>
+        <div class="table-scroll">
+          <table class="data-table" id="sampleTable">
+            <thead>
+              <tr>
+                <th scope="col">Sample #</th>
+                <th scope="col" class="num">Time (ms)</th>
+                <th scope="col" class="num">Amplitude</th>
+                <th scope="col" class="num">Level</th>
+                <th scope="col" class="num">Binary</th>
+              </tr>
+            </thead>
+            <tbody id="sampleBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="results-section">
+        <h2>Binary output</h2>
+        <output id="binaryLine" class="binary-line" aria-label="Full binary result"></output>
+        <p class="total-bits">Total bits: <strong id="totalBitsCount"></strong> <span class="dim" id="totalBitsBreakdown"></span></p>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2>Test results</h2>
+    <div class="table-scroll">
+      <table class="data-table" id="testTable">
+        <thead>
+          <tr>
+            <th scope="col">Test</th>
+            <th scope="col">Frequency</th>
+            <th scope="col">Amplitude</th>
+            <th scope="col">Samples</th>
+            <th scope="col">Bits</th>
+            <th scope="col">Period</th>
+            <th scope="col">Wavelength</th>
+            <th scope="col">Total bits</th>
+            <th scope="col">Binary result</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>A</td>
+            <td>440</td>
+            <td>0.8</td>
+            <td>8</td>
+            <td>3</td>
+            <td class="num">2.27 ms</td>
+            <td>78.0 cm</td>
+            <td class="num">24</td>
+            <td class="num">100 101 110 101 100 010 001 010</td>
+          </tr>
+          <tr>
+            <td>B</td>
+            <td>200</td>
+            <td>0.5</td>
+            <td>6</td>
+            <td>4</td>
+            <td class="num">5.00 ms</td>
+            <td>1.72 m</td>
+            <td class="num">24</td>
+            <td class="num">1000 1011 1011 1000 0100 0100</td>
+          </tr>
+          <tr>
+            <td>C</td>
+            <td>500</td>
+            <td>0.9</td>
+            <td>5</td>
+            <td>3</td>
+            <td class="num">2.00 ms</td>
+            <td>68.6 cm</td>
+            <td class="num">15</td>
+            <td class="num">100 110 101 010 001</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">These values were produced by running each setting through this app.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Explain it</h2>
+    <ol class="explain">
+      <li><strong>How my app turns a wave into binary.</strong> It samples the wave’s height at equal time steps across one full period, rounds each height to the nearest level, then writes every level in binary using the chosen bit depth.</li>
+      <li><strong>Test A with 2 bits vs 6 bits.</strong> 6 bits gives more detail because it has 64 levels instead of 4, so the binary follows the wave’s height more closely — it also uses more bits for the same number of samples.</li>
+      <li><strong>Longest wavelength.</strong> Test B (200 Hz) has the longest wavelength, because wavelength = 343 ÷ frequency, so a lower frequency means a longer wavelength.</li>
+      <li><strong>Hardest stage.</strong> The hardest stage was the binary stage, because a height exactly halfway between two levels must round up; I fixed it by comparing my table with the given example and correcting the rounding until every row matched.</li>
+    </ol>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="wrap">Sound-to-binary converter · built with HTML, CSS, and JavaScript</div>
+</footer>
+<script>
+(function () {
+  'use strict';
+
+  // ==CORE==
+  function roundToText(value, dp) {
+    var f = Math.pow(10, dp);
+    var sign = value < 0 ? -1 : 1;
+    var n = Math.floor(Math.abs(value) * f + 0.5 + 1e-9) * sign;
+    return (n / f).toFixed(dp);
+  }
+
+  function wavelengthText(lambda) {
+    if (lambda >= 1) return roundToText(lambda, 2) + ' m';
+    return roundToText(lambda * 100, 1) + ' cm';
+  }
+
+  function validateInputs(raw) {
+    var errors = [];
+    var freqText = String(raw.freq == null ? '' : raw.freq).trim();
+    var ampText = String(raw.amp == null ? '' : raw.amp).trim();
+    var samplesText = String(raw.samples == null ? '' : raw.samples).trim();
+    var bitsText = String(raw.bits == null ? '' : raw.bits).trim();
+    var freq = Number(freqText);
+    var amp = Number(ampText);
+    var n = Number(samplesText);
+    var bits = Number(bitsText);
+
+    if (freqText === '' || !Number.isFinite(freq) || freq <= 0) {
+      errors.push('Frequency must be a number greater than 0.');
+    }
+    if (ampText === '' || !Number.isFinite(amp) || amp < 0 || amp > 1) {
+      errors.push('Amplitude must be a number from 0 to 1.');
+    }
+    if (samplesText === '' || !Number.isInteger(n) || n < 2 || n > 64) {
+      errors.push('Samples must be a whole number from 2 to 64.');
+    }
+    if (bitsText === '' || !Number.isInteger(bits) || bits < 1 || bits > 8) {
+      errors.push('Bits must be a whole number from 1 to 8.');
+    }
+
+    return {
+      ok: errors.length === 0,
+      errors: errors,
+      freq: freq,
+      amp: amp,
+      n: n,
+      bits: bits,
+      freqText: freqText,
+      ampText: ampText
+    };
+  }
+
+  function computeWave(freq, amp, n, bits) {
+    var period = 1000 / freq;
+    var lambda = 343 / freq;
+    var levels = Math.pow(2, bits);
+    var rows = [];
+    var binaries = [];
+
+    for (var i = 0; i < n; i++) {
+      var time = i * period / n;
+      var height = amp * Math.sin(2 * Math.PI * i / n);
+      var rawLevel = (height + 1) / 2 * (levels - 1);
+      var level = Math.floor(rawLevel + 0.5 + 1e-9);
+      if (level < 0) level = 0;
+      if (level > levels - 1) level = levels - 1;
+      var binary = level.toString(2);
+      while (binary.length < bits) binary = '0' + binary;
+
+      rows.push({
+        num: i + 1,
+        time: time,
+        height: height,
+        level: level,
+        binary: binary,
+        timeText: roundToText(time, 2),
+        heightText: roundToText(height, 2)
+      });
+      binaries.push(binary);
+    }
+
+    return {
+      period: period,
+      periodText: roundToText(period, 2),
+      wavelength: lambda,
+      wavelengthText: wavelengthText(lambda),
+      levels: levels,
+      rows: rows,
+      totalBits: n * bits,
+      binaryLine: binaries.join(' ')
+    };
+  }
+  // ==ENDCORE==
+
+  function byId(id) {
+    return document.getElementById(id);
+  }
+
+  var last = null;
+
+  function showWarnings(errors) {
+    var box = byId('warningBox');
+    var list = byId('warningList');
+    list.textContent = '';
+    if (!errors.length) {
+      box.hidden = true;
+      return;
+    }
+    errors.forEach(function (msg) {
+      var li = document.createElement('li');
+      li.textContent = msg;
+      list.appendChild(li);
+    });
+    box.hidden = false;
+  }
+
+  function drawScope(amp, result) {
+    var canvas = byId('scopeCanvas');
+    var w = canvas.clientWidth;
+    var h = canvas.clientHeight;
+    if (!w || !h) return;
+
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    var ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    var padX = 16;
+    var padY = 16;
+    var iw = w - padX * 2;
+    var ih = h - padY * 2;
+    var mid = padY + ih / 2;
+    var yOf = function (v) { return mid - v * (ih / 2); };
+
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(92,242,160,0.08)';
+    for (var g = 0; g <= 10; g++) {
+      var gx = Math.round(padX + iw * g / 10) + 0.5;
+      ctx.beginPath();
+      ctx.moveTo(gx, padY);
+      ctx.lineTo(gx, padY + ih);
+      ctx.stroke();
+    }
+    for (var d = 0; d <= 4; d++) {
+      var gy = Math.round(padY + ih * d / 4) + 0.5;
+      ctx.beginPath();
+      ctx.moveTo(padX, gy);
+      ctx.lineTo(padX + iw, gy);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+    ctx.beginPath();
+    ctx.moveTo(padX, Math.round(mid) + 0.5);
+    ctx.lineTo(padX + iw, Math.round(mid) + 0.5);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#5cf2a0';
+    ctx.lineWidth = 1.75;
+    ctx.lineJoin = 'round';
+    var steps = Math.max(240, Math.round(iw));
+    ctx.beginPath();
+    for (var px = 0; px <= steps; px++) {
+      var x = padX + iw * px / steps;
+      var y = yOf(amp * Math.sin(2 * Math.PI * px / steps));
+      if (px === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    var n = result.rows.length;
+    ctx.save();
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = 'rgba(231,237,233,0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (var s = 0; s < n; s++) {
+      var q = 2 * result.rows[s].level / (result.levels - 1) - 1;
+      var sx0 = padX + iw * s / n;
+      var sx1 = padX + iw * (s + 1) / n;
+      var sy = yOf(q);
+      if (s === 0) ctx.moveTo(sx0, sy);
+      else ctx.lineTo(sx0, sy);
+      ctx.lineTo(sx1, sy);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = '#e7ede9';
+    for (var t = 0; t < n; t++) {
+      var dx = padX + iw * t / n;
+      var dy = yOf(result.rows[t].height);
+      ctx.beginPath();
+      ctx.arc(dx, dy, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function render(result, v) {
+    byId('factAmplitude').textContent = v.ampText;
+    byId('factFrequency').textContent = v.freqText + ' Hz';
+    byId('factPeriod').textContent = result.periodText + ' ms';
+    byId('factWavelength').textContent = result.wavelengthText;
+
+    var tbody = byId('sampleBody');
+    tbody.textContent = '';
+    var frag = document.createDocumentFragment();
+    result.rows.forEach(function (row) {
+      var tr = document.createElement('tr');
+      [row.num, row.timeText, row.heightText, row.level, row.binary].forEach(function (val, idx) {
+        var td = document.createElement('td');
+        td.textContent = String(val);
+        if (idx >= 1) td.className = 'num';
+        tr.appendChild(td);
+      });
+      frag.appendChild(tr);
+    });
+    tbody.appendChild(frag);
+
+    byId('binaryLine').textContent = result.binaryLine;
+    byId('totalBitsCount').textContent = String(result.totalBits);
+    byId('totalBitsBreakdown').textContent = '(' + v.n + ' samples × ' + v.bits + ' bits)';
+
+    drawScope(v.amp, result);
+  }
+
+  function convert() {
+    var v = validateInputs({
+      freq: byId('frequencyInput').value,
+      amp: byId('amplitudeInput').value,
+      samples: byId('samplesInput').value,
+      bits: byId('bitsInput').value
+    });
+
+    if (!v.ok) {
+      showWarnings(v.errors);
+      byId('results').hidden = true;
+      last = null;
+      return;
+    }
+
+    showWarnings([]);
+    var result = computeWave(v.freq, v.amp, v.n, v.bits);
+    byId('results').hidden = false;
+    render(result, v);
+    last = { amp: v.amp, result: result };
+  }
+
+  var audioCtx = null;
+
+  function playTone() {
+    var freqText = byId('frequencyInput').value.trim();
+    var freq = Number(freqText);
+    if (freqText === '' || !Number.isFinite(freq) || freq <= 0) {
+      showWarnings(['Frequency must be a number greater than 0 to play a tone.']);
+      return;
+    }
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) {
+      showWarnings(['This browser does not support the Web Audio API.']);
+      return;
+    }
+    showWarnings([]);
+    if (!audioCtx) audioCtx = new AC();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    var t0 = audioCtx.currentTime;
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(0.18, t0 + 0.02);
+    gain.gain.setValueAtTime(0.18, t0 + 0.9);
+    gain.gain.linearRampToValueAtTime(0, t0 + 1);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(t0);
+    osc.stop(t0 + 1.02);
+  }
+
+  byId('controlForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    convert();
+  });
+  byId('playBtn').addEventListener('click', playTone);
+  ['frequencyInput', 'amplitudeInput', 'samplesInput', 'bitsInput'].forEach(function (id) {
+    byId(id).addEventListener('input', function () {
+      showWarnings([]);
+    });
+  });
+
+  var resizeTimer = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      if (last) drawScope(last.amp, last.result);
+    }, 120);
+  });
+
+  convert();
+})();
+</script>
+</body>
+</html>
